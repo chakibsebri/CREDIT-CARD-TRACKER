@@ -44,14 +44,14 @@ dialog{border:0;border-radius:18px;width:min(92%,460px);padding:0;box-shadow:0 2
 <div class="row"><span>Next due</span><strong id="heroNext">—</strong></div>
 </section>
 <div class="section"><h2>My Cards</h2><div style="display:flex;gap:8px">
-<button class="secondary" onclick="addSample()">Demo Data</button>
-<button class="primary" onclick="openAdd()">+ Add Card</button>
+<button id="demoBtn" class="secondary" type="button">Demo Data</button>
+<button id="addBtn" class="primary" type="button">+ Add Card</button>
 </div></div>
 <div id="cards" class="cards"></div>
 <div class="section"><h2>Quick Summary</h2></div>
 <div class="card" id="summary"></div>
 
-<div class="section"><h2>Payment History</h2><button class="secondary" onclick="clearHistory()">Clear History</button></div>
+<div class="section"><h2>Payment History</h2><button id="clearBtn" class="secondary" type="button">Clear History</button></div>
 <div id="history" class="cards"></div>
 </main>
 
@@ -64,7 +64,7 @@ dialog{border:0;border-radius:18px;width:min(92%,460px);padding:0;box-shadow:0 2
 <label>Minimum payment<input id="minimum" type="number" min="0" step="0.01" required placeholder="0"></label>
 <label>Due date<input id="due" type="date" required></label>
 <label>Planned payment<input id="plannedInput" type="number" min="0" step="0.01" required placeholder="0"></label>
-<div class="actions"><button type="button" class="secondary" onclick="dlg.close()">Cancel</button><button class="primary">Save</button></div>
+<div class="actions"><button id="cancelBtn" type="button" class="secondary">Cancel</button><button class="primary" type="submit">Save</button></div>
 </form></div></dialog>
 
 <dialog id="payDlg"><div class="modal">
@@ -73,11 +73,13 @@ dialog{border:0;border-radius:18px;width:min(92%,460px);padding:0;box-shadow:0 2
 <form id="payForm">
 <label>Payment amount<input id="payAmount" type="number" min="0" step="0.01" required></label>
 <label>Payment date<input id="payDate" type="date" required></label>
-<div class="actions"><button type="button" class="secondary" onclick="payDlg.close()">Cancel</button><button class="primary">Mark Paid</button></div>
+<div class="actions"><button id="payCancelBtn" type="button" class="secondary">Cancel</button><button class="primary" type="submit">Mark Paid</button></div>
 </form></div></dialog>
 
 <script>
 const KEY="cc_tracker_v1", HIST="cc_tracker_history_v1";
+const dlg=document.getElementById("dlg"), payDlg=document.getElementById("payDlg");
+const makeId=()=>{try{return crypto.randomUUID()}catch(e){return Date.now().toString(36)+Math.random().toString(36).slice(2)}};
 let cards=JSON.parse(localStorage.getItem(KEY)||"[]"), history=JSON.parse(localStorage.getItem(HIST)||"[]"), editing=null, paying=null;
 const $=id=>document.getElementById(id), money=n=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(n||0);
 const today=()=>new Date().toISOString().slice(0,10);
@@ -86,18 +88,18 @@ function addSample(){
  if(cards.length && !confirm("Add demo cards to your existing list?")) return;
  const d=new Date(); const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0");
  cards.push(
- {id:crypto.randomUUID(),name:"Chase Sapphire",balance:3250,limit:10000,minimum:85,due:`${y}-${m}-25`,planned:500},
- {id:crypto.randomUUID(),name:"American Express",balance:1840,limit:8000,minimum:65,due:`${y}-${m}-28`,planned:300},
- {id:crypto.randomUUID(),name:"Capital One",balance:920,limit:5000,minimum:35,due:`${y}-${m}-03`,planned:100}
+ {id:makeId(),name:"Chase Sapphire",balance:3250,limit:10000,minimum:85,due:`${y}-${m}-25`,planned:500},
+ {id:makeId(),name:"American Express",balance:1840,limit:8000,minimum:65,due:`${y}-${m}-28`,planned:300},
+ {id:makeId(),name:"Capital One",balance:920,limit:5000,minimum:35,due:`${y}-${m}-03`,planned:100}
  ); save()
 }
 function openAdd(c=null){editing=c?.id||null;$("modalTitle").textContent=c?"Edit Credit Card":"Add Credit Card";$("name").value=c?.name||"";$("balance").value=c?.balance??"";$("limit").value=c?.limit??"";$("minimum").value=c?.minimum??"";$("due").value=c?.due||"";$("plannedInput").value=c?.planned??"";dlg.showModal()}
-$("form").onsubmit=e=>{e.preventDefault();let obj={id:editing||crypto.randomUUID(),name:$("name").value,balance:+$("balance").value,limit:+$("limit").value||0,minimum:+$("minimum").value,due:$("due").value,planned:+$("plannedInput").value};let i=cards.findIndex(x=>x.id===obj.id);i>=0?cards[i]=obj:cards.push(obj);dlg.close();save()};
+$("form").onsubmit=e=>{e.preventDefault();let obj={id:editing||makeId(),name:$("name").value,balance:+$("balance").value,limit:+$("limit").value||0,minimum:+$("minimum").value,due:$("due").value,planned:+$("plannedInput").value};let i=cards.findIndex(x=>x.id===obj.id);i>=0?cards[i]=obj:cards.push(obj);dlg.close();save()};
 function status(c){let d=Math.ceil((new Date(c.due+"T23:59:59")-new Date())/86400000);return d<0?["Overdue","bad"]:d<=5?["Due soon","warn"]:["Upcoming",""];}
 function render(){let total=cards.reduce((s,c)=>s+c.balance,0), mins=cards.reduce((s,c)=>s+c.minimum,0), plan=cards.reduce((s,c)=>s+c.planned,0);$("total").textContent=money(total);$("mins").textContent=money(mins);$("planned").textContent=money(plan);$("count").textContent=cards.length;
 $("heroTotal").textContent=money(total);$("heroPlanned").textContent=money(plan);
 let next=cards.slice().sort((a,b)=>a.due.localeCompare(b.due))[0];$("heroNext").textContent=next?`${next.name} • ${new Date(next.due+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric"})}`:"—";
-$("cards").innerHTML=cards.length?cards.map(c=>{let [st,cl]=status(c),util=c.limit?Math.min(100,c.balance/c.limit*100):0;return `<article class="card"><div class="cardtop"><div><h3>${esc(c.name)}</h3><div class="muted">Due ${new Date(c.due+"T12:00:00").toLocaleDateString()}</div></div><span class="badge ${cl}">${st}</span></div><div class="balance">${money(c.balance)}</div>${c.limit?`<div class="row"><span class="muted">Utilization</span><b>${util.toFixed(0)}%</b></div><div class="progress"><span style="width:${util}%"></span></div>`:""}<div class="row"><span class="muted">Minimum</span><b>${money(c.minimum)}</b></div><div class="row"><span class="muted">Planned payment</span><b>${money(c.planned)}</b></div><div class="actions"><button class="secondary" onclick='openAdd(${JSON.stringify(c)})'>Edit</button><button class="primary" onclick='openPay("${c.id}")'>Record Payment</button><button class="danger" onclick='removeCard("${c.id}")'>Delete</button></div></article>`}).join(""):`<div class="card empty">No credit cards yet.<br>Tap <b>+ Add Card</b> to get started.</div>`;
+$("cards").innerHTML=cards.length?cards.map(c=>{let [st,cl]=status(c),util=c.limit?Math.min(100,c.balance/c.limit*100):0;return `<article class="card"><div class="cardtop"><div><h3>${esc(c.name)}</h3><div class="muted">Due ${new Date(c.due+"T12:00:00").toLocaleDateString()}</div></div><span class="badge ${cl}">${st}</span></div><div class="balance">${money(c.balance)}</div>${c.limit?`<div class="row"><span class="muted">Utilization</span><b>${util.toFixed(0)}%</b></div><div class="progress"><span style="width:${util}%"></span></div>`:""}<div class="row"><span class="muted">Minimum</span><b>${money(c.minimum)}</b></div><div class="row"><span class="muted">Planned payment</span><b>${money(c.planned)}</b></div><div class="actions"><button class="secondary" data-action="edit" data-id="${c.id}">Edit</button><button class="primary" data-action="pay" data-id="${c.id}">Record Payment</button><button class="danger" data-action="delete" data-id="${c.id}">Delete</button></div></article>`}).join(""):`<div class="card empty">No credit cards yet.<br>Tap <b>+ Add Card</b> to get started.</div>`;
 let soon=cards.filter(c=>status(c)[0]!=="Upcoming").sort((a,b)=>a.due.localeCompare(b.due));
 $("summary").innerHTML=cards.length?`<div class="row"><span class="muted">Payments planned this cycle</span><b>${money(cards.reduce((a,c)=>a+c.planned,0))}</b></div><div class="row"><span class="muted">Cards needing attention</span><b>${soon.length}</b></div><div class="row"><span class="muted">Overall utilization</span><b>${(()=>{let l=cards.reduce((a,c)=>a+c.limit,0),b=cards.reduce((a,c)=>a+c.balance,0);return l?(b/l*100).toFixed(1)+"%":"—"})()}</b></div>`:`<div class="empty">Add your cards to see your summary.</div>`;
 $("history").innerHTML=history.length?history.slice().reverse().map(h=>`<article class="card"><div class="row"><b>${esc(h.name)}</b><span class="paid">${money(h.amount)} paid</span></div><div class="muted">${new Date(h.date+"T12:00:00").toLocaleDateString()}</div></article>`).join(""):`<div class="card empty">No payments recorded yet.</div>`}\nfunction openPay(id){paying=id;let c=cards.find(x=>x.id===id);$("payCard").textContent=c.name+" — current balance "+money(c.balance);$("payAmount").value=c.planned||c.minimum;$("payDate").value=today();payDlg.showModal()}
@@ -105,6 +107,12 @@ $("payForm").onsubmit=e=>{e.preventDefault();let c=cards.find(x=>x.id===paying),
 function removeCard(id){if(confirm("Delete this card?")){cards=cards.filter(c=>c.id!==id);save()}}
 function clearHistory(){if(confirm("Clear payment history?")){history=[];save()}}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+$("demoBtn").addEventListener("click", addSample);
+$("addBtn").addEventListener("click", ()=>openAdd());
+$("clearBtn").addEventListener("click", clearHistory);
+$("cancelBtn").addEventListener("click", ()=>dlg.close());
+$("payCancelBtn").addEventListener("click", ()=>payDlg.close());
+$("cards").addEventListener("click", e=>{const b=e.target.closest("button[data-action]");if(!b)return;const id=b.dataset.id;const c=cards.find(x=>x.id===id);if(b.dataset.action==="edit")openAdd(c);else if(b.dataset.action==="pay")openPay(id);else if(b.dataset.action==="delete")removeCard(id);});
 render();
 </script>
 <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}</script></body></html>
