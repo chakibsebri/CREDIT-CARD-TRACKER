@@ -1,0 +1,9 @@
+{
+  "name": "Credit Card Tracker",
+  "short_name": "Card Tracker",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2457d6",
+  "description": "Track credit card balances, payments, due dates and utilization."
+}
